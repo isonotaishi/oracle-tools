@@ -1,0 +1,4 @@
+username: 'XXXXX'
+hostname: 'server'
+port: '1521'
+service_name: 'service'
