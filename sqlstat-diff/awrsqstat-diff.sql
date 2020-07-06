@@ -1,11 +1,17 @@
-define term1_begin = 26010
-define term1_end   = 26110
-define term2_begin = 26130
+define term1_begin = 26120
+define term1_end   = 26150
+define term2_begin = 26160
 define term2_end   = 26230
 
 set verify off
+set line 3000
 set pages 0
+set long 1000000
+set longchunksize 1000000
 set feed off
+set trims on
+
+spool test_sqldiff.log
 
 WITH t1 AS (
   select
@@ -148,13 +154,41 @@ select
   '</style>' || CHR(10) ||
   '</head>' || CHR(10) ||
   '<body>' || CHR(10) ||
+  '<h2>AWR SQLSTAT DIFF REPORT</h2>' || CHR(10)
+from dual
+union all
+select
+  '<h4>begin and end time at term1,term2</h4>' || CHR(10) ||
+  '<table border="1">' || CHR(10) ||
+  '<tr><th class="wb">term</th><th class="wb">Begin SnapID</th><th class="wb">Begin Time</th><th class="wb">END SnapID</th><th class="wb">End Time</th></tr>' || CHR(10) ||
+  '<tr><td class="ac">term1</td>' || 
+    '<td class="ac">' || &term1_begin || '</td>' ||
+    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_begin and instance_number = 1) || '</td>' ||
+    '<td class="ac">' || &term1_end || '</td>' ||
+    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_end and instance_number = 1) || '</td>' ||
+  '</tr>' || CHR(10) ||
+  '<tr><td class="ac">term2</td>' || 
+    '<td class="ac">' || &term2_begin || '</td>' ||
+    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_begin and instance_number = 1) || '</td>' ||
+    '<td class="ac">' || &term2_end || '</td>' ||
+    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_end and instance_number = 1) || '</td>' ||
+  '</tr>' || CHR(10) ||
+  '</table>' || CHR(10)
+from dual
+union all
+select
+  '<h4>legends of AWR SQLDIFF results</h4>' || CHR(10) ||
   '<table border="1">' || CHR(10) ||
   '<tr><td class="ae">legends</td><td class="ae090">top 10%</td><td class="ae080">top 20%</td><td class="ae070">top 30%</td><td class="ae060">top 40%</td><td class="ae050">top 50%</td><td class="ae040">top 60%</td><td class="ae030">top 70%</td><td class="ae020">top 80%</td><td class="ae010">top 90%</td></tr>'  || CHR(10) ||
   '<tr><td class="ae"></td><td class="ae090">' || p090 || '</td><td class="ae080">' || p080 || '</td><td class="ae070">' || p070 || '</td><td class="ae060">' || p060 || '</td><td class="ae050">' || p050 || '</td><td class="ae040">' || p040 || '</td><td class="ae030">' || p030 || '</td><td class="ae020">' || p020 || '</td><td class="ae010">' || p010 || '</td></tr>'  || CHR(10) ||
-  '</table>' || CHR(10) ||
+  '</table>' || CHR(10)
+from percentile
+union all
+select
+  '<h3>AWR SQLDIFF results(term2 / term1)</h3>' || CHR(10) ||
   '<table border="1">' || CHR(10) ||
   '<tr><th class="wb">SQL_ID</th><th class="wb">AVG_ELAPSED_TIME_T1</th><th class="wb">AVG_ELAPSED_TIME_T2</th><th class="wb">ELAPSED_TIME</th><th class="wb">CPU_TIME</th><th class="wb">BUFFER_GETS</th><th class="wb">IOWAIT</th><th class="wb">CLWAIT</th><th class="wb">APWAIT</th><th class="wb">CCWAIT</th><th class="wb">PLSEXEC_TIME</th><th class="wb">JAVEXEC_TIME</th><th class="wb">ROWS_PROCESSED</th><th class="wb">FETCHES</th><th class="wb">SORTS</th><th class="wb">DISK_READS</th><th class="wb">DIRECT_WRITES</th><th class="wb">PHYSICAL_READ_REQUESTS</th><th class="wb">PHYSICAL_READ_BYTES</th><th class="wb">PHYSICAL_WRITE_REQUESTS</th><th class="wb">PHYSICAL_WRITE_BYTES</th><th class="wb">OPTIMIZED_PHYSICAL_READS</th><th class="wb">CELL_UNCOMPRESSED_BYTES</th><th class="wb">IO_OFFLOAD_RETURN_BYTES</th><th class="wb">IO_OFFLOAD_ELIG_BYTES</th><th class="wb">IO_INTERCONNECT_BYTES</th></tr>' || CHR(10)
-from percentile
+from dual
 union all
 select
   '<tr><td class="ac">' || SQL_ID || '</td>' ||
@@ -441,6 +475,45 @@ from result, percentile
 union all
 select
   '</table>' || CHR(10) ||
+  '<h4>SQL_ID and SQL_TEXT</h4>' || CHR(10) ||
+  '<table>' || CHR(10) ||
+  '<tr><th class="wb">SQL_ID</th><th class="wb">SQL_TEXT</th></tr>' || CHR(10)
+from dual
+;
+WITH t1 AS (
+  select
+    distinct SQL_ID
+  from dba_hist_sqlstat
+  where snap_id >= &term1_begin
+    and snap_id <= &term1_end
+),
+t2 AS (
+  select
+    distinct SQL_ID
+  from dba_hist_sqlstat
+  where snap_id >= &term2_begin
+    and snap_id <= &term2_end
+),
+result AS (
+  select
+    t1.sql_id  
+  from t1, t2
+  where t1.sql_id = t2.sql_id
+  order by sql_id
+)
+select
+  xmlelement("tr", 
+    xmlconcat(
+      xmlelement("td", XMLATTRIBUTES('ac' as class), sql_id),
+      xmlelement("td", XMLATTRIBUTES('ac' as class), sql_text)
+    )
+  )
+from
+  ( select sql_id, ( select XMLAGG( XMLELEMENT(e, sql_text).EXTRACT('//text()') ).GetClobVal() from dba_hist_sqltext where sql_id = r.SQL_ID ) as sql_text from result r )
+;
+select
+  '</table>' || CHR(10) ||
   '</body>' || CHR(10) ||
   '</html>'
 from dual;
+spool off
