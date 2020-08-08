@@ -27,14 +27,20 @@ class db_connect():
         
         def get_instance_name(cfg):
             return cfg['instance_name']
+        
+        def get_net_service_name(cfg):
+            return cfg['net_service_name']
 
         with open(config, 'r+') as cfg:
             connect_to = yaml.safe_load(cfg)
 
         try:
-            self.connect_identifier = '{0}:{1}/{2}'.format(get_hostname(connect_to), get_port(connect_to), get_service_name(connect_to))
-            if 'instance_name' in connect_to:
-                self.connect_identifier += '/' + get_instance_name(connect_to)
+            if 'net_service_name' in connect_to:
+                self.connect_identifier = '{0}'.format(get_net_service_name(connect_to))
+            else:
+                self.connect_identifier = '{0}:{1}/{2}'.format(get_hostname(connect_to), get_port(connect_to), get_service_name(connect_to))
+                if 'instance_name' in connect_to:
+                    self.connect_identifier += '/' + get_instance_name(connect_to)
                 
             self.username = get_username(connect_to)
             self.password = getpass('input password for oracle account: ')
@@ -49,6 +55,10 @@ class db_connect():
             with cx_Oracle.connect(self.username, self.password, self.connect_identifier) as conn:
                 with conn.cursor() as cur:
                     cur.execute('''select 1 from dual''')
+
+                    if cur.fetchone() is not None:
+                        print('Success to connect!')
+                    
         except Exception as e:
             '''失敗原因の切り分けのルーチン'''
             print(e)

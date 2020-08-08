@@ -1,4 +1,6 @@
-username: 'XXXXX'
-hostname: 'server'
-port: '1521'
-service_name: 'service'
+username: 'ADMIN'
+net_service_name: 'oratest_medium'
+
+# hostname: 'server'
+# port: '1521'
+# service_name: 'service'
