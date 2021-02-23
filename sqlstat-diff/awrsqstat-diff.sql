@@ -1,7 +1,20 @@
-define term1_begin = 26120
-define term1_end   = 26150
-define term2_begin = 26160
-define term2_end   = 26230
+ACCEPT DAY number -
+PROMPT "Enter num of days for searching snap_id : "
+select snap_id, dbid, con_id, to_char(min(end_interval_time), 'YYYY-MM-DD HH24:MI:SS')
+from dba_hist_snapshot
+where end_interval_time > SYSDATE - &DAY
+  and dbid = ( select con_dbid from v$database )
+group by snap_id, dbid, con_id
+order by snap_id;
+
+ACCEPT term1_begin number -
+PROMPT "snap_id for BEGIN of term1 : "
+ACCEPT term1_end number -
+PROMPT "snap_id for END of term1   : "
+ACCEPT term2_begin number -
+PROMPT "snap_id for BEGIN of term2 : "
+ACCEPT term2_end number -
+PROMPT "snap_id for END of term2   : "
 
 set verify off
 set line 3000
@@ -154,40 +167,110 @@ select
   '</style>' || CHR(10) ||
   '</head>' || CHR(10) ||
   '<body>' || CHR(10) ||
-  '<h2>AWR SQLSTAT DIFF REPORT</h2>' || CHR(10)
+  xmlelement("h2", 'AWR SQLSTAT DIFF REPORT') || CHR(10) ||
+  xmlelement("h4", 'begin and end time at term1,term2') || CHR(10) ||
+  xmlelement("table", XMLATTRIBUTES(1 as border),
+    xmlconcat(
+      xmlelement("tr", 
+        xmlconcat(
+          xmlelement("th", XMLATTRIBUTES('wb' as class), 'term'),
+          xmlelement("th", XMLATTRIBUTES('wb' as class), 'BEGIN SnapID'),
+          xmlelement("th", XMLATTRIBUTES('wb' as class), 'BEGIN Time'),
+          xmlelement("th", XMLATTRIBUTES('wb' as class), 'END SnapID'),
+          xmlelement("th", XMLATTRIBUTES('wb' as class), 'END Time')
+        )
+      ),
+      xmlelement("tr", 
+        xmlconcat(
+          xmlelement("td", XMLATTRIBUTES('ac' as class), 'term1'),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), &term1_begin),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), (select to_char(min(END_INTERVAL_TIME),'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_begin group by snap_id)),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), &term1_end),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), (select to_char(min(END_INTERVAL_TIME),'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_end group by snap_id))
+        )
+      ),
+      xmlelement("tr", 
+        xmlconcat(
+          xmlelement("td", XMLATTRIBUTES('ac' as class), 'term2'),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), &term2_begin),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), (select to_char(min(END_INTERVAL_TIME),'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_begin group by snap_id)),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), &term2_end),
+          xmlelement("td", XMLATTRIBUTES('ac' as class), (select to_char(min(END_INTERVAL_TIME),'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_end group by snap_id))
+        )
+      )
+    )
+  ) || CHR(10)
 from dual
 union all
 select
-  '<h4>begin and end time at term1,term2</h4>' || CHR(10) ||
-  '<table border="1">' || CHR(10) ||
-  '<tr><th class="wb">term</th><th class="wb">Begin SnapID</th><th class="wb">Begin Time</th><th class="wb">END SnapID</th><th class="wb">End Time</th></tr>' || CHR(10) ||
-  '<tr><td class="ac">term1</td>' || 
-    '<td class="ac">' || &term1_begin || '</td>' ||
-    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_begin and instance_number = 1) || '</td>' ||
-    '<td class="ac">' || &term1_end || '</td>' ||
-    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term1_end and instance_number = 1) || '</td>' ||
-  '</tr>' || CHR(10) ||
-  '<tr><td class="ac">term2</td>' || 
-    '<td class="ac">' || &term2_begin || '</td>' ||
-    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_begin and instance_number = 1) || '</td>' ||
-    '<td class="ac">' || &term2_end || '</td>' ||
-    '<td class="ac">' || (select to_char(END_INTERVAL_TIME,'YYYY-MM-DD HH24:MI:SS') from dba_hist_snapshot where snap_id = &term2_end and instance_number = 1) || '</td>' ||
-  '</tr>' || CHR(10) ||
-  '</table>' || CHR(10)
-from dual
-union all
-select
-  '<h4>legends of AWR SQLDIFF results</h4>' || CHR(10) ||
-  '<table border="1">' || CHR(10) ||
-  '<tr><td class="ae">legends</td><td class="ae090">top 10%</td><td class="ae080">top 20%</td><td class="ae070">top 30%</td><td class="ae060">top 40%</td><td class="ae050">top 50%</td><td class="ae040">top 60%</td><td class="ae030">top 70%</td><td class="ae020">top 80%</td><td class="ae010">top 90%</td></tr>'  || CHR(10) ||
-  '<tr><td class="ae"></td><td class="ae090">' || p090 || '</td><td class="ae080">' || p080 || '</td><td class="ae070">' || p070 || '</td><td class="ae060">' || p060 || '</td><td class="ae050">' || p050 || '</td><td class="ae040">' || p040 || '</td><td class="ae030">' || p030 || '</td><td class="ae020">' || p020 || '</td><td class="ae010">' || p010 || '</td></tr>'  || CHR(10) ||
-  '</table>' || CHR(10)
+  xmlelement("h4", 'legends of AWR SQLDIFF results') || CHR(10) ||
+  xmlelement("table", XMLATTRIBUTES(1 as border),
+    xmlconcat(
+      xmlelement("tr", 
+        xmlconcat(
+          xmlelement("td", XMLATTRIBUTES('ae' as class), 'legends'),
+          xmlelement("td", XMLATTRIBUTES('ae090' as class), 'top 10%'),
+          xmlelement("td", XMLATTRIBUTES('ae080' as class), 'top 20%'),
+          xmlelement("td", XMLATTRIBUTES('ae070' as class), 'top 30%'),
+          xmlelement("td", XMLATTRIBUTES('ae060' as class), 'top 40%'),
+          xmlelement("td", XMLATTRIBUTES('ae050' as class), 'top 50%'),
+          xmlelement("td", XMLATTRIBUTES('ae040' as class), 'top 60%'),
+          xmlelement("td", XMLATTRIBUTES('ae030' as class), 'top 70%'),
+          xmlelement("td", XMLATTRIBUTES('ae020' as class), 'top 80%'),
+          xmlelement("td", XMLATTRIBUTES('ae010' as class), 'top 90%')
+        )
+      ),
+      xmlelement("tr", 
+        xmlconcat(
+          xmlelement("td", XMLATTRIBUTES('ae' as class), ''),
+          xmlelement("td", XMLATTRIBUTES('ae090' as class), p090),
+          xmlelement("td", XMLATTRIBUTES('ae080' as class), p080),
+          xmlelement("td", XMLATTRIBUTES('ae070' as class), p070),
+          xmlelement("td", XMLATTRIBUTES('ae060' as class), p060),
+          xmlelement("td", XMLATTRIBUTES('ae050' as class), p050),
+          xmlelement("td", XMLATTRIBUTES('ae040' as class), p040),
+          xmlelement("td", XMLATTRIBUTES('ae030' as class), p030),
+          xmlelement("td", XMLATTRIBUTES('ae020' as class), p020),
+          xmlelement("td", XMLATTRIBUTES('ae010' as class), p010)
+        )
+      )
+    )
+  ) || CHR(10)
 from percentile
 union all
 select
-  '<h3>AWR SQLDIFF results(term2 / term1)</h3>' || CHR(10) ||
+  xmlelement("h3", 'AWR SQLDIFF results') || CHR(10) ||
   '<table border="1">' || CHR(10) ||
-  '<tr><th class="wb">SQL_ID</th><th class="wb">AVG_ELAPSED_TIME_T1</th><th class="wb">AVG_ELAPSED_TIME_T2</th><th class="wb">ELAPSED_TIME</th><th class="wb">CPU_TIME</th><th class="wb">BUFFER_GETS</th><th class="wb">IOWAIT</th><th class="wb">CLWAIT</th><th class="wb">APWAIT</th><th class="wb">CCWAIT</th><th class="wb">PLSEXEC_TIME</th><th class="wb">JAVEXEC_TIME</th><th class="wb">ROWS_PROCESSED</th><th class="wb">FETCHES</th><th class="wb">SORTS</th><th class="wb">DISK_READS</th><th class="wb">DIRECT_WRITES</th><th class="wb">PHYSICAL_READ_REQUESTS</th><th class="wb">PHYSICAL_READ_BYTES</th><th class="wb">PHYSICAL_WRITE_REQUESTS</th><th class="wb">PHYSICAL_WRITE_BYTES</th><th class="wb">OPTIMIZED_PHYSICAL_READS</th><th class="wb">CELL_UNCOMPRESSED_BYTES</th><th class="wb">IO_OFFLOAD_RETURN_BYTES</th><th class="wb">IO_OFFLOAD_ELIG_BYTES</th><th class="wb">IO_INTERCONNECT_BYTES</th></tr>' || CHR(10)
+  xmlelement("tr", 
+    xmlconcat(
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'SQL_ID'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'AVG_ELAPSED_TIME_T1'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'AVG_ELAPSED_TIME_T2'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'ELAPSED_TIME'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'CPU_TIME'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'BUFFER_GETS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'IOWAIT'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'CLWAIT'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'APWAIT'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'CCWAIT'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'PLSEXEC_TIME'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'JAVEXEC_TIME'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'ROWS_PROCESSED'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'FETCHES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'SORTS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'DISK_READS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'DIRECT_WRITES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'PHYSICAL_READ_REQUESTS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'PHYSICAL_READ_BYTES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'PHYSICAL_WRITE_REQUESTS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'PHYSICAL_WRITE_BYTES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'OPTIMIZED_PHYSICAL_READS'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'CELL_UNCOMPRESSED_BYTES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'IO_OFFLOAD_RETURN_BYTES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'IO_OFFLOAD_ELIG_BYTES'),
+      xmlelement("th", XMLATTRIBUTES('wb' as class), 'IO_INTERCONNECT_BYTES')
+    )
+  )
 from dual
 union all
 select
@@ -475,9 +558,8 @@ from result, percentile
 union all
 select
   '</table>' || CHR(10) ||
-  '<h4>SQL_ID and SQL_TEXT</h4>' || CHR(10) ||
-  '<table>' || CHR(10) ||
-  '<tr><th class="wb">SQL_ID</th><th class="wb">SQL_TEXT</th></tr>' || CHR(10)
+  xmlelement("h4", 'SQL_ID and SQL_TEXT') || CHR(10) ||
+  '<table>' || CHR(10)
 from dual
 ;
 WITH t1 AS (
@@ -502,14 +584,30 @@ result AS (
   order by sql_id
 )
 select
-  xmlelement("tr", 
-    xmlconcat(
-      xmlelement("td", XMLATTRIBUTES('ac' as class), sql_id),
-      xmlelement("td", XMLATTRIBUTES('ac' as class), sql_text)
+  xmlconcat(
+    xmlelement("tr", 
+      xmlconcat(
+        xmlelement("th", XMLATTRIBUTES('wb' as class), 'SQL_ID'),
+        xmlelement("th", XMLATTRIBUTES('wb' as class), 'SQL_TEXT')
+      )
+    ),
+    xmlelement("tr", 
+      xmlconcat(
+        xmlelement("td", XMLATTRIBUTES('ac' as class), sql_id),
+        xmlelement("td", XMLATTRIBUTES('ac' as class), sql_text)
+      )
     )
   )
 from
-  ( select sql_id, ( select XMLAGG( XMLELEMENT(e, sql_text).EXTRACT('//text()') ).GetClobVal() from dba_hist_sqltext where sql_id = r.SQL_ID ) as sql_text from result r )
+  ( select
+      sql_id,
+      ( select XMLAGG( XMLELEMENT(e, sql_text).EXTRACT('//text()') ).GetClobVal()
+        from dba_hist_sqltext
+        where sql_id = r.SQL_ID
+        fetch first 1 rows only
+      ) as sql_text
+    from result r
+  )
 ;
 select
   '</table>' || CHR(10) ||
